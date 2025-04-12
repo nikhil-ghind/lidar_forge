@@ -1,0 +1,17 @@
+build/
+output/
+checkpoints/
+analysis_plots/
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+dist/
+*.o
+*.a
+*.so
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+*.onnx

@@ -1,0 +1,29 @@
+{
+  "lidar": {
+    "num_beams": 64,
+    "horizontal_res": 0.18,
+    "vertical_fov_min": -24.8,
+    "vertical_fov_max": 2.0,
+    "max_range": 100.0,
+    "min_range": 0.5,
+    "sensor_height": 1.73
+  },
+  "noise": {
+    "range_sigma": 0.02,
+    "dropout_rate": 0.01,
+    "intensity_sigma": 0.03,
+    "enable_range_noise": true,
+    "enable_dropout": true
+  },
+  "scene": {
+    "min_objects": 0,
+    "max_objects": 8,
+    "road_width": 10.0,
+    "scene_radius": 60.0
+  },
+  "generator": {
+    "num_scenes": 1000,
+    "output_dir": "output",
+    "seed": 42
+  }
+}
