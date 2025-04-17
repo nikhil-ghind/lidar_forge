@@ -36,6 +36,50 @@ python -m python.training.export_model --checkpoint checkpoints/best_generator.p
 python -m python.analysis.distribution_analysis --real_dir ./real_data/velodyne --gen_dir ./data/velodyne
 ```
 
+## Test
+
+C++ unit tests (Google Test) cover the ray caster, noise model, and annotation
+generator:
+
+```bash
+cd build
+ctest --output-on-failure
+# or:
+./tests/test_ray_caster
+./tests/test_noise_model
+./tests/test_annotation
+```
+
+End-to-end smoke test:
+
+```bash
+./build/lidar_generator --config config/default_config.json --output /tmp/lf --count 10
+ls /tmp/lf/velodyne/*.bin /tmp/lf/labels/*.json | wc -l   # expect 20
+```
+
+## Evaluation
+
+`python/analysis/distribution_analysis.py` compares generated point clouds
+against a held-out real KITTI split. Run after exporting a generator
+checkpoint:
+
+```bash
+python -m python.analysis.distribution_analysis \
+  --real_dir ./real_data/velodyne \
+  --gen_dir  ./data/velodyne \
+  --out      ./reports/distribution.json
+```
+
+Metrics reported:
+
+| Task | Metric | Where |
+|------|--------|-------|
+| Generative fidelity | Chamfer distance, Earth Mover's Distance between real and generated clouds | `distribution_analysis.py` |
+| Distributional match | KL / Jensen-Shannon divergence over per-point range, intensity, and density histograms | `distribution_analysis.py` |
+| Coverage | minimum-matching-distance (MMD) and coverage (COV) across the test split | `distribution_analysis.py` |
+| Annotation quality (detection on augmented set) | mAP@IoU=0.5 / 0.7 on a downstream PointNet/PointPillars detector trained with vs. without synthetic data | external; feed `data/labels/*.json` + `data/velodyne/*.bin` into a KITTI-format detector |
+| Sensor realism | per-beam dropout rate and range-noise stddev vs. real scans | `distribution_analysis.py` |
+
 ## Architecture
 
 ```
