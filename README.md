@@ -2,11 +2,63 @@
 
 C++17 LiDAR point cloud synthesis pipeline with PointNet-based generative model for augmenting autonomous driving datasets.
 
+## Architecture
+
+```mermaid
+flowchart TB
+    cfg["config/default_config.json<br/>sensor profile, scene ranges, noise params"]
+
+    subgraph cpp["C++17 engine (src/, include/lidar_gen/)"]
+        main["main.cpp<br/>--config --output --count"]
+        batch["BatchGenerator<br/>generate() and generate_to_disk()<br/>sequential loop with a progress callback"]
+        scene["SceneParser::generate_random<br/>SceneDescription: boxes, ground plane"]
+        ray["RayCaster<br/>beam pattern from the sensor profile<br/>ray_aabb_intersection, ray_plane_intersection"]
+        noise["NoiseModel<br/>range-dependent Gaussian, dropout,<br/>intensity perturbation"]
+        ann["annotation_generator<br/>SceneAnnotation boxes from hit points"]
+        out["output_writer<br/>write_bin (KITTI velodyne), write_labels"]
+    end
+
+    disk[("data/<br/>velodyne/*.bin + label_2/*.txt")]
+
+    subgraph py["Python (python/)"]
+        ds["training/dataset.py<br/>loads the generated clouds"]
+        gan["models/pointnet_generator.py<br/>TNet, PointNetEncoder,<br/>PointNetGenerator, PointNetDiscriminator"]
+        train["training/train.py"]
+        export["training/export_model.py<br/>ONNX"]
+        analysis["analysis/distribution_analysis.py<br/>real vs generated histograms"]
+    end
+
+    cfg --> main --> batch
+    batch --> scene --> ray --> noise --> ann --> out --> disk
+    disk --> ds --> train
+    gan --> train --> export
+    disk --> analysis
+```
+
+Ray casting is the hot inner loop: every beam in the sensor profile is tested
+against each scene AABB and the ground plane, the nearest hit wins, and the
+surviving points are then perturbed by the noise model.
+
+```mermaid
+flowchart LR
+    beams["For each beam<br/>azimuth x elevation from the sensor profile"]
+    cast["Cast Ray from the sensor origin"]
+    aabb["ray_aabb_intersection<br/>over every object box"]
+    plane["ray_plane_intersection<br/>ground plane"]
+    near["Keep the nearest hit within max range"]
+    nz["NoiseModel<br/>jitter range, drop points, perturb intensity"]
+    pt["Append x, y, z, intensity to the PointCloud"]
+
+    beams --> cast --> aabb --> near
+    cast --> plane --> near
+    near --> nz --> pt
+```
+
 ## Overview
 
 - **Ray-cast engine** — beam-accurate simulation from configurable sensor parameters (64-beam Velodyne HDL-64E profile), AABB intersection, ground-plane intersection
 - **Physics-grounded noise** — range-dependent Gaussian noise, random dropout, intensity perturbation
-- **Batch generation** — parallel scene generation with JSON scene descriptions, KITTI binary output
+- **Batch generation** — sequential scene loop with JSON scene descriptions and KITTI binary output (`generate_to_disk` reports progress through a callback)
 - **PointNet GAN** — conditional generator trained on real scans; exports to ONNX
 - **Distribution analysis** — point density, range, and intensity histograms comparing real vs generated clouds
 
